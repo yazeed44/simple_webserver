@@ -74,8 +74,8 @@ int read_from_client(int new_client_socket, char* buf){
     return num_bytes;
 }
 
-int write_to_client(int new_client_socket, char* buf){
-    int numbytes = write(new_client_socket, buf, strlen(buf));
+int write_to_client(int new_client_socket, char* buf, size_t length){
+    int numbytes = write(new_client_socket, buf, length);
     if (numbytes < 0)
         print_and_exit("write_to_client: problem with writing to client\n");
     return numbytes;
@@ -126,7 +126,7 @@ int get_file_size(char *file_name){
 void create_reply_header(char *uri, int new_client_socket){
 
     if (!does_file_exists(uri)){
-        write_to_client(new_client_socket, ERROR_MSG);
+        write_to_client(new_client_socket, ERROR_MSG, strlen(ERROR_MSG));
         printf("File does not exist = %s\n", uri);
         print_and_exit("create_reply_header: file does not exist\n");
     }
@@ -138,7 +138,7 @@ void create_reply_header(char *uri, int new_client_socket){
     memset(reply_header, 0, BUF_LEN);
     // TODO change hard valued http version to dynamic
     sprintf(reply_header,"HTTP/1.1 200 Document Follows\r\nContent-Type: %s\r\nContent-Length: %d\r\n\r\n", file_type,file_size);
-    write_to_client(new_client_socket, reply_header);
+    write_to_client(new_client_socket, reply_header, strlen(reply_header));
     printf("create_reply_header: header is %s\n", reply_header); //DEBUG
 }
 FILE* open_file(char *file_name, char* mode){
@@ -149,23 +149,29 @@ FILE* open_file(char *file_name, char* mode){
     return file;
 }
 void send_response(char *uri, int new_client_socket){
-    FILE *file_to_send = open_file(uri, "rb");
-    printf("send_response: before sending the file %s\n", uri); // DEBUG
-    char filebuf[BUF_LEN];
-    memset(filebuf, 0, BUF_LEN);
-    //TODO double check while loop condition
-    while (1){
-        int numbytes = fread(filebuf, 1, BUF_LEN, file_to_send);
-        if ( numbytes == 0)
-            break;
-        numbytes = write_to_client(new_client_socket, filebuf);
-        if (numbytes == -1) {
-            write_to_client(new_client_socket, ERROR_MSG);
-            print_and_exit("send_response: Failed to send packet\n");
-        }
-        memset(filebuf, 0, BUF_LEN);
-    }
-    fclose(file_to_send);
+	char filebuf[BUF_LEN];
+
+	memset(filebuf,0,BUF_LEN);
+
+	FILE *file_to_send = open_file(uri, "r");
+
+	// read until EOF
+	while(1)
+	{
+		int numbytes = fread(filebuf,1,BUF_LEN, file_to_send);
+		if(numbytes == 0)
+		{
+			break;
+		}
+		numbytes = write_to_client(new_client_socket, filebuf, numbytes);
+		if(numbytes ==-1)
+		{
+			write_to_client(new_client_socket, ERROR_MSG, strlen(ERROR_MSG));
+			print_and_exit("send_response: failed to send packet\n");
+		}
+		memset(filebuf,0, BUF_LEN);
+	}
+	fclose(file_to_send);
 }
 void handle_http_get(char *buf, int new_client_socket, int sockfd){
     
@@ -183,7 +189,7 @@ void handle_http_get(char *buf, int new_client_socket, int sockfd){
 
 void send_http_post(char *uri, int new_client_socket, char* post_data){
     if (!does_file_exists) {
-        write_to_client(new_client_socket, ERROR_MSG);
+        write_to_client(new_client_socket, ERROR_MSG, strlen(ERROR_MSG));
         print_and_exit("send_http_post: File not found\n");
     }
 
@@ -191,17 +197,18 @@ void send_http_post(char *uri, int new_client_socket, char* post_data){
     char post_header[BUF_LEN];
     memset(post_header, 0, BUF_LEN);
     sprintf(post_header,"HTTP/1.1 200 Document Follows\r\nContent-Type: text/html\r\nContent-Length: %ld\r\n\r\n", get_file_size(uri));
-    write_to_client(new_client_socket, post_header);
+    write_to_client(new_client_socket, post_header, BUF_LEN);
 
     // POST BODY OPENING
     char *body_op = "<html><body><pre><h1>";
-    write_to_client(new_client_socket, body_op);
+    write_to_client(new_client_socket, body_op, strlen(body_op));
 
     // POST DATA
-    write_to_client(new_client_socket, post_data);
+    write_to_client(new_client_socket, post_data, strlen(post_data));
 
     // POST BODY CLOSING
-    write_to_client(new_client_socket, "</h1></pre>");
+    char *body_close = "</h1></pre>";
+    write_to_client(new_client_socket, body_close, strlen(body_close));
 
     // POST FILE CONTENT
     send_response(uri, new_client_socket);
@@ -219,7 +226,7 @@ void handle_http_post(char *buf, int new_client_socket, int sockfd){
 
 void handle_http_error(char *buf, int new_client_socket, int sockfd){
     printf("handle_http_error: unsupported operation = %s\n", buf);
-    write_to_client(new_client_socket, ERROR_MSG);
+    write_to_client(new_client_socket, ERROR_MSG, strlen(ERROR_MSG));
     exit(0);
 }
 void handle_http_request(int new_client_socket, int sockfd){
