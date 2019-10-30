@@ -1,0 +1,15 @@
+Yazeed Almuqwishi - PA2
+
+I implemented a web server in C that loads web page on a specified port by the user. I supported two HTTP request methods => GET, POST
+
+To run:
+gcc server.c && ./a.out port_number
+
+Then go to browser and type:
+localhost:port_number
+
+To send a POST request, open a terminal and type:
+  (echo -en "POST /index.html HTTP/1.1\r\nHost: localhost\r\nConnection: Keep-alive
+  \r\n\r\nPOSTDATA") | nc 127.0.0.1 port_number
+  
+Substitute port_number with your chosen port number for the server
